@@ -11,34 +11,26 @@
 
 UnoKeyboardEvent::UnoKeyboardEvent() {
 	eventBytesSize = 0;
-	for(int i = 0; i < UNOKEYEVENT_MAX_BYTES_SIZE; i++) {
+	for (int i = 0; i < UNOKEYEVENT_MAX_BYTES_SIZE; i++) {
 		bytes[i] = 0;
 	}
-	state = 0;
-}
-
-void UnoKeyboardEvent::setState(int inState) {
-	state = inState;
-}
-
-int UnoKeyboardEvent::getState() {
-	return state;
 }
 
 bool UnoKeyboardEvent::isKeyPress() {
-	return (state & UNOKEYEVENT_IS_PRESSED) == UNOKEYEVENT_IS_PRESSED;
+	switch (eventBytesSize) {
+		case 1:
+			return true;
+		case 2:
+			/** Key release byte in simple 1 byte codes **/
+			return bytes[0] != UNOKEYTRANSFER_KEY_RELEASE;
+		default:
+			/** Key release byte in longer codes **/
+			return bytes[1] != UNOKEYTRANSFER_KEY_RELEASE;
+	}
 }
 
 bool UnoKeyboardEvent::isKeyRelease() {
-	return (state & UNOKEYEVENT_IS_RELEASED) == UNOKEYEVENT_IS_RELEASED;
-}
-
-void UnoKeyboardEvent::markAsKeyPress() {
-	state |= UNOKEYEVENT_IS_PRESSED;
-}
-
-void UnoKeyboardEvent::markAsKeyRelease() {
-	state |= UNOKEYEVENT_IS_RELEASED;
+	return !isKeyPress();
 }
 
 void UnoKeyboardEvent::addByte(byte inByte) {
@@ -47,7 +39,7 @@ void UnoKeyboardEvent::addByte(byte inByte) {
 }
 
 int UnoKeyboardEvent::getKey() {
-	if(eventBytesSize > 1) {
+	if (eventBytesSize > 1) {
 		return bytes[1];
 	}
 	return bytes[0];

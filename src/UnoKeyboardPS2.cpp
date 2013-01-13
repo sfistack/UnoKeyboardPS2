@@ -10,9 +10,6 @@
 #define UNOKEYBOARD_DATA_ENTITY_BITS_WIDTH 11
 #define DATA_TRANSFER_FAILURE_MILLIS_TRESHOLD 25
 
-#define UNOKEYTRANSFER_KEY_RELEASE 0xF0
-#define UNOKEYTRANSFER_KEY_SPECIAL 0xE0
-
 /** UnoKeyboardPS2 implementation **/
 
 UnoKeyboardPS2* UnoKeyboardPS2::instance = NULL;
@@ -26,6 +23,8 @@ UnoKeyboardPS2* UnoKeyboardPS2::getInstance() {
 }
 
 UnoKeyboardPS2::UnoKeyboardPS2() {
+	eventInProgress = NULL;
+	lastCompletedEvent = NULL;
 }
 
 void UnoKeyboardPS2::initialize(UnoPS2Connector inConnector) {
@@ -51,11 +50,16 @@ void UnoKeyboardPS2::onClockInterrupt() {
 	static byte transmissionValue = 0;
 	static byte processedBits = 0;
 	static byte continueStream = 0;
+	int lineState = 0;
+
+#ifdef USE_TRANSMISSION_PARITY_CHECK
+	static byte parityValue = 0;
+#endif
+#ifdef USE_TRANSMISSION_TIMEOUTS
 	static int lastBitSentStamp = millis();
 	static int now = 0;
-	static int lineState = 0;
+#endif
 
-	lineState = digitalRead(connector.DATA_PIN);
 #ifdef USE_TRANSMISSION_TIMEOUTS
 	/** If multibyte transmission was detected, check for timeout **/
 	if(continueStream) {
@@ -73,46 +77,72 @@ void UnoKeyboardPS2::onClockInterrupt() {
 		}
 	}
 #endif
-	//DEBUG_PRINTLN_UNOKEYBOARD(processedBits);
-	/** New bit transmission, get time stamp **/
-	lastBitSentStamp = millis();
 
-	if(processedBits < UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH) {
+	if (processedBits == 0) {
+		transmissionValue = 0;
+		if (continueStream == 0) {
+			/** Short ISR path, now its time to malloc **/
+			eventInProgress = new UnoKeyboardEvent();
+		}
+	}
+
+	if (processedBits < UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH) {
 		processedBits++;
 		return;
 	}
 
-	if (processedBits < (UNOKEYBOARD_CRUCIAL_DATA_BITS_WIDTH + UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH)) {
-		transmissionValue |= (lineState << (processedBits - UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH));
-		DEBUG_PRINT_UNOKEYBOARD(lineState);
+	if (processedBits
+			< (UNOKEYBOARD_CRUCIAL_DATA_BITS_WIDTH
+					+ UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH)) {
+		lineState = digitalRead(connector.DATA_PIN);
+		transmissionValue |= (lineState
+				<< (processedBits - UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH));
 		processedBits++;
+#ifdef USE_TRANSMISSION_PARITY_CHECK
+		parityValue += lineState;
+#endif
 		return;
 	}
 
+#ifdef USE_TRANSMISSION_PARITY_CHECK
+	/** This is a odd parity bit. Make check if parity number is odd **/
+	if (processedBits
+			== (UNOKEYBOARD_CRUCIAL_DATA_BITS_WIDTH
+					+ UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH)) {
+		parityValue += digitalRead(connector.DATA_PIN);
+	}
+
+	/** Parity blocker, if no match for parity check, skip to end of byte **/
+	if ((parityValue % 2) == 0) {
+		if (processedBits == UNOKEYBOARD_DATA_ENTITY_BITS_WIDTH - 1) {
+			parityValue = 0;
+			continueStream = 0;
+			transmissionValue = 0;
+			processedBits = 0;
+			return;
+		}
+		processedBits++;
+		return;
+	}
+#endif
 	/** Substract 1 because we are counting up from 0 **/
 	if (processedBits == UNOKEYBOARD_DATA_ENTITY_BITS_WIDTH - 1) {
 		processedBits = 0;
-		DEBUG_PRINTLN_UNOKEYBOARD(" EOB");
 		eventInProgress->addByte(transmissionValue);
-		/** check if its longer key code or its a key release event **/
-		if (transmissionValue == UNOKEYTRANSFER_KEY_RELEASE) {
+		/** Check if its longer key code or its a key release event **/
+		if (transmissionValue == UNOKEYTRANSFER_KEY_RELEASE
+				|| transmissionValue == UNOKEYTRANSFER_KEY_SPECIAL) {
 			continueStream = 1;
-			eventInProgress->markAsKeyRelease();
-		} else if (transmissionValue == UNOKEYTRANSFER_KEY_SPECIAL) {
-			continueStream = 1;
-		} else {
-			if (!eventInProgress->isKeyRelease()) {
-				eventInProgress->markAsKeyPress();
-			}
-			/** move completed event **/
-			if (NULL != lastCompletedEvent) {
-				delete lastCompletedEvent;
-			}
-			lastCompletedEvent = eventInProgress;
-			eventInProgress = new UnoKeyboardEvent();
-			continueStream = 0;
+			return;
 		}
-		transmissionValue = 0;
+		/** This is end of package **/
+		continueStream = 0;
+		/** Move completed event **/
+		if (NULL != lastCompletedEvent) {
+			delete lastCompletedEvent;
+		}
+		lastCompletedEvent = eventInProgress;
+		/** Leave regeneration of eventInProgress to next iteration **/
 	} else {
 		processedBits++;
 	}
@@ -120,5 +150,7 @@ void UnoKeyboardPS2::onClockInterrupt() {
 
 /** To get (void*) handle for attachInterrupt **/
 void onUNOKeyboardPS2ClockInterrupt() {
-	UnoKeyboardPS2::getInstance()->onClockInterrupt();
+	/** Speed up a little by static reference holder **/
+	static UnoKeyboardPS2 *useInstance = UnoKeyboardPS2::getInstance();
+	useInstance->onClockInterrupt();
 }

@@ -11,18 +11,23 @@ void setup() {
 	connector.setDataPin(8).setIrqPin(3).setIrqNum(1);
 	keyboard->initialize(connector);
 	lastEventTime = millis();
-	Serial.begin(9600);
+	Serial.begin(38400);
 }
 
 void loop() {
 	UnoKeyboardEvent* event = keyboard->getLastEvent();
-	if(NULL != event) {
-		unsigned long now = millis();
-		int dump = (event->isKeyRelease() ? 10000 : 1000) + event->getKey();
-		delete event;
-		Serial.println(dump);
+	unsigned long now = millis();
+	if(now - lastEventTime > 100) {
+		Serial.print("PING ");
+		Serial.println(now);
 		lastEventTime = now;
 	}
+	if(NULL != event) {
+		Serial.print(event->isKeyRelease() ? "R: " : "P: ");
+		Serial.println(event->getKey());
+		delete event;
+	}
+
 }
 
 int main(void) {

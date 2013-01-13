@@ -16,7 +16,6 @@
 # define DEBUG_PRINTLN_UNOKEYBOARD(x)
 #endif
 
-
 #include "UnoKeyboardEvent.h"
 
 /**
