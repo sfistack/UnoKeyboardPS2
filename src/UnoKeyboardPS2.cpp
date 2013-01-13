@@ -41,7 +41,7 @@ UnoKeyboardEvent* UnoKeyboardPS2::getLastEvent() {
 	if (lastCompletedEvent == NULL) {
 		return NULL;
 	}
-	UnoKeyboardEvent *event = lastCompletedEvent;
+	static UnoKeyboardEvent *event = lastCompletedEvent;
 	lastCompletedEvent = NULL;
 	return event;
 }
@@ -61,7 +61,7 @@ void UnoKeyboardPS2::onClockInterrupt() {
 #endif
 
 #ifdef USE_TRANSMISSION_TIMEOUTS
-	/** If multibyte transmission was detected, check for timeout **/
+	/** If multiple bytes transmission was detected, check for timeout **/
 	if(continueStream) {
 		now = millis();
 		/** Check for data transfer failure. If it happens, abort current construction **/
@@ -125,7 +125,7 @@ void UnoKeyboardPS2::onClockInterrupt() {
 		return;
 	}
 #endif
-	/** Substract 1 because we are counting up from 0 **/
+	/** Subtract 1 because we are counting up from 0 **/
 	if (processedBits == UNOKEYBOARD_DATA_ENTITY_BITS_WIDTH - 1) {
 		processedBits = 0;
 		eventInProgress->addByte(transmissionValue);
@@ -142,6 +142,7 @@ void UnoKeyboardPS2::onClockInterrupt() {
 			delete lastCompletedEvent;
 		}
 		lastCompletedEvent = eventInProgress;
+		eventInProgress = NULL;
 		/** Leave regeneration of eventInProgress to next iteration **/
 	} else {
 		processedBits++;
