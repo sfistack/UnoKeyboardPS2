@@ -16,15 +16,25 @@ void setup() {
 
 void loop() {
 	UnoKeyboardEvent* event = keyboard->getLastEvent();
-	unsigned long now = millis();
-	if(now - lastEventTime > 100) {
-		Serial.print("PING ");
-		Serial.println(now);
-		lastEventTime = now;
-	}
+//	unsigned long now = millis();
+//	if(now - lastEventTime > 100) {
+//		Serial.print("PING ");
+//		Serial.println(now);
+//		lastEventTime = now;
+//	}
 	if(NULL != event) {
 		Serial.print(event->isKeyRelease() ? "R: " : "P: ");
-		Serial.println(event->getKey());
+		switch(event->getKey()) {
+			case Keys::KEY_UP:
+				Serial.println("UP!");
+				break;
+			case Keys::KEY_ESC:
+				Serial.println("ESC!");
+				break;
+			case Keys::KEY_SPACE:
+				Serial.println("SPACE!");
+				break;
+		}
 		delete event;
 	}
 

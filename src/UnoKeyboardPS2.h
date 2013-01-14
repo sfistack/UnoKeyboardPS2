@@ -6,7 +6,10 @@
 
 /** Switch debug on **/
 #define DEBUG_UNOKEYBOARD
+/** Do we want to use transmission timeouts **/
 //#define USE_TRANSMISSION_TIMEOUTS
+/** Do we want to verify transmission data integrity **/
+//#define USE_TRANSMISSION_PARITY_CHECK
 
 #ifdef DEBUG_UNOKEYBOARD
 # define DEBUG_PRINT_UNOKEYBOARD(x) Serial.print(x);
@@ -17,6 +20,14 @@
 #endif
 
 #include "UnoKeyboardEvent.h"
+
+/** Crucial definitions **/
+namespace UnoKeyboardConfig {
+	const int IGNORE_INITIAL_BITS_COUNT = 1;
+	const int DATA_BITS_COUNT = 8;
+	const int DATA_PACKAGE_BITS_SIZE = 11;
+	const int TIMEOUT_MILLIS_DIFF_TRESHOLD = 25;
+}
 
 /**
  * Connector for PS/2 Devices for UNO
@@ -55,8 +66,8 @@ private:
 	 * This is not comfortable solution. Client of UnoKeyboardPS2 is
 	 * responsible for whole memory state of the arduino device.
 	 */
-	UnoKeyboardEvent* eventInProgress;
-	UnoKeyboardEvent* lastCompletedEvent;
+	volatile UnoKeyboardEvent* eventInProgress;
+	volatile UnoKeyboardEvent* lastCompletedEvent;
 
 public:
 	static UnoKeyboardPS2* getInstance();
@@ -69,15 +80,6 @@ public:
 
 	/** Fetch last event caught by UnoKeyboardPS2. You are obligated to free it. **/
 	UnoKeyboardEvent* getLastEvent();
-
-	/** Translate keyboard event to integer key representation **/
-	int getKey(UnoKeyboardEvent event);
-
-	/** Has key been pressed **/
-	bool isKeyPress(UnoKeyboardEvent event);
-
-	/** Has key been released **/
-	bool isKeyRelease(UnoKeyboardEvent event);
 
 	/** Handle on interrupt **/
 	void onClockInterrupt();

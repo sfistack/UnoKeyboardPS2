@@ -5,11 +5,6 @@
 #include <Arduino.h>
 #include "UnoKeyboardPS2.h"
 
-#define UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH 1
-#define UNOKEYBOARD_CRUCIAL_DATA_BITS_WIDTH 8
-#define UNOKEYBOARD_DATA_ENTITY_BITS_WIDTH 11
-#define DATA_TRANSFER_FAILURE_MILLIS_TRESHOLD 25
-
 /** UnoKeyboardPS2 implementation **/
 
 UnoKeyboardPS2* UnoKeyboardPS2::instance = NULL;
@@ -38,10 +33,11 @@ void UnoKeyboardPS2::initialize(UnoPS2Connector inConnector) {
 }
 
 UnoKeyboardEvent* UnoKeyboardPS2::getLastEvent() {
-	if (lastCompletedEvent == NULL) {
+	/** TODO: Without this check, UNO still crashes after some time of usage **/
+	if(lastCompletedEvent == NULL) {
 		return NULL;
 	}
-	static UnoKeyboardEvent *event = lastCompletedEvent;
+	UnoKeyboardEvent *event = (UnoKeyboardEvent*)lastCompletedEvent;
 	lastCompletedEvent = NULL;
 	return event;
 }
@@ -65,7 +61,7 @@ void UnoKeyboardPS2::onClockInterrupt() {
 	if(continueStream) {
 		now = millis();
 		/** Check for data transfer failure. If it happens, abort current construction **/
-		if (now - lastBitSentStamp > DATA_TRANSFER_FAILURE_MILLIS_TRESHOLD) {
+		if (now - lastBitSentStamp > UnoKeyboardConfig::TIMEOUT_MILLIS_DIFF_TRESHOLD) {
 			lastBitSentStamp = now;
 			transmissionValue = 0;
 			processedBits = 0;
@@ -86,17 +82,17 @@ void UnoKeyboardPS2::onClockInterrupt() {
 		}
 	}
 
-	if (processedBits < UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH) {
+	if (processedBits < UnoKeyboardConfig::IGNORE_INITIAL_BITS_COUNT) {
 		processedBits++;
 		return;
 	}
 
 	if (processedBits
-			< (UNOKEYBOARD_CRUCIAL_DATA_BITS_WIDTH
-					+ UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH)) {
+			< (UnoKeyboardConfig::DATA_BITS_COUNT
+					+ UnoKeyboardConfig::IGNORE_INITIAL_BITS_COUNT)) {
 		lineState = digitalRead(connector.DATA_PIN);
 		transmissionValue |= (lineState
-				<< (processedBits - UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH));
+				<< (processedBits - UnoKeyboardConfig::IGNORE_INITIAL_BITS_COUNT));
 		processedBits++;
 #ifdef USE_TRANSMISSION_PARITY_CHECK
 		parityValue += lineState;
@@ -107,14 +103,14 @@ void UnoKeyboardPS2::onClockInterrupt() {
 #ifdef USE_TRANSMISSION_PARITY_CHECK
 	/** This is a odd parity bit. Make check if parity number is odd **/
 	if (processedBits
-			== (UNOKEYBOARD_CRUCIAL_DATA_BITS_WIDTH
-					+ UNOKEYBOARD_IGNORE_INITIAL_BITS_WIDTH)) {
+			== (UnoKeyboardConfig::DATA_BITS_COUNT
+					+ UnoKeyboardConfig::IGNORE_INITIAL_BITS_COUNT)) {
 		parityValue += digitalRead(connector.DATA_PIN);
 	}
 
 	/** Parity blocker, if no match for parity check, skip to end of byte **/
 	if ((parityValue % 2) == 0) {
-		if (processedBits == UNOKEYBOARD_DATA_ENTITY_BITS_WIDTH - 1) {
+		if (processedBits == UnoKeyboardConfig::DATA_PACKAGE_BITS_SIZE - 1) {
 			parityValue = 0;
 			continueStream = 0;
 			transmissionValue = 0;
@@ -126,12 +122,12 @@ void UnoKeyboardPS2::onClockInterrupt() {
 	}
 #endif
 	/** Subtract 1 because we are counting up from 0 **/
-	if (processedBits == UNOKEYBOARD_DATA_ENTITY_BITS_WIDTH - 1) {
+	if (processedBits == UnoKeyboardConfig::DATA_PACKAGE_BITS_SIZE - 1) {
 		processedBits = 0;
-		eventInProgress->addByte(transmissionValue);
+		((UnoKeyboardEvent*)eventInProgress)->addByte(transmissionValue);
 		/** Check if its longer key code or its a key release event **/
-		if (transmissionValue == UNOKEYTRANSFER_KEY_RELEASE
-				|| transmissionValue == UNOKEYTRANSFER_KEY_SPECIAL) {
+		if (transmissionValue == UnoKeyConfig::RELEASE_KEY_VALUE
+				|| transmissionValue == UnoKeyConfig::EXTENDED_KEY_VALUE) {
 			continueStream = 1;
 			return;
 		}

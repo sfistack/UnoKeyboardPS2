@@ -11,7 +11,7 @@
 
 UnoKeyboardEvent::UnoKeyboardEvent() {
 	eventBytesSize = 0;
-	for (int i = 0; i < UNOKEYEVENT_MAX_BYTES_SIZE; i++) {
+	for (int i = 0; i < UnoKeyConfig::MAX_KEY_BYTES_SIZE; i++) {
 		bytes[i] = 0;
 	}
 }
@@ -22,10 +22,10 @@ bool UnoKeyboardEvent::isKeyPress() {
 			return true;
 		case 2:
 			/** Key release byte in simple 1 byte codes **/
-			return bytes[0] != UNOKEYTRANSFER_KEY_RELEASE;
+			return bytes[0] != UnoKeyConfig::RELEASE_KEY_VALUE;
 		default:
 			/** Key release byte in longer codes **/
-			return bytes[1] != UNOKEYTRANSFER_KEY_RELEASE;
+			return bytes[1] != UnoKeyConfig::RELEASE_KEY_VALUE;
 	}
 }
 
@@ -38,9 +38,25 @@ void UnoKeyboardEvent::addByte(byte inByte) {
 	eventBytesSize++;
 }
 
+/** Currently not handling PAUSE and PRINT_SCREEN **/
 int UnoKeyboardEvent::getKey() {
-	if (eventBytesSize > 1) {
-		return bytes[1];
+	int keyValue = 0;
+
+	if (eventBytesSize > 3) {
+		return Keys::KEY_NOT_HANDLED;
 	}
-	return bytes[0];
+	/** Scan bytes for non-release values. Without PAUSE and PRINT_SCREEN
+	 *  keys, there can be only one byte with key value + optional extended
+	 *  flag.
+	 */
+	for(int i = 0; i < eventBytesSize; i++) {
+		if(bytes[i] == UnoKeyConfig::RELEASE_KEY_VALUE) {
+			continue;
+		}
+		if(bytes[i] == UnoKeyConfig::EXTENDED_KEY_VALUE) {
+			keyValue += 0x0F00;
+		}
+		keyValue += bytes[i];
+	}
+	return keyValue;
 }
