@@ -66,8 +66,8 @@ private:
 	 * This is not comfortable solution. Client of UnoKeyboardPS2 is
 	 * responsible for whole memory state of the arduino device.
 	 */
-	volatile UnoKeyboardEvent* eventInProgress;
-	volatile UnoKeyboardEvent* lastCompletedEvent;
+	UnoKeyboardEvent* volatile eventInProgress;
+	UnoKeyboardEvent* volatile lastCompletedEvent;
 
 public:
 	static UnoKeyboardPS2* getInstance();

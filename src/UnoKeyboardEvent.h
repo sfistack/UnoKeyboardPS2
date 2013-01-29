@@ -33,12 +33,12 @@ namespace Keys {
 	const int KEY_TAB = 13;
 	const int KEY_SPACE = 41;
 	const int KEY_RETURN = 90;
-	const int KEY_RETURN_NUM = 4154;
+	const int KEY_RETURN_NUM = 3930;
 	const int KEY_LALT = 17;
-	const int KEY_UP = 4181;
-	const int KEY_DOWN = 4178;
-	const int KEY_LEFT = 4171;
-	const int KEY_RIGHT = 4180;
+	const int KEY_UP = 3957;
+	const int KEY_DOWN = 3954;
+	const int KEY_LEFT = 3947;
+	const int KEY_RIGHT = 3956;
 	const int KEY_ESC = 118;
 }
 

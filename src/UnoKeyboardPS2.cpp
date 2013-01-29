@@ -33,12 +33,11 @@ void UnoKeyboardPS2::initialize(UnoPS2Connector inConnector) {
 }
 
 UnoKeyboardEvent* UnoKeyboardPS2::getLastEvent() {
-	/** TODO: Without this check, UNO still crashes after some time of usage **/
-	if(lastCompletedEvent == NULL) {
-		return NULL;
-	}
-	UnoKeyboardEvent *event = (UnoKeyboardEvent*)lastCompletedEvent;
+	/** We must quiet interrupts for assignment time! A panda dies w/o interrupts mute **/
+	noInterrupts();
+	UnoKeyboardEvent* event = lastCompletedEvent;
 	lastCompletedEvent = NULL;
+	interrupts();
 	return event;
 }
 
@@ -46,7 +45,7 @@ void UnoKeyboardPS2::onClockInterrupt() {
 	static byte transmissionValue = 0;
 	static byte processedBits = 0;
 	static byte continueStream = 0;
-	int lineState = 0;
+	static int lineState = 0;
 
 #ifdef USE_TRANSMISSION_PARITY_CHECK
 	static byte parityValue = 0;
@@ -77,7 +76,7 @@ void UnoKeyboardPS2::onClockInterrupt() {
 	if (processedBits == 0) {
 		transmissionValue = 0;
 		if (continueStream == 0) {
-			/** Short ISR path, now its time to malloc **/
+			/** Short ISR path, now its time to malloc. Let`s hope mem space is there. **/
 			eventInProgress = new UnoKeyboardEvent();
 		}
 	}
@@ -124,7 +123,10 @@ void UnoKeyboardPS2::onClockInterrupt() {
 	/** Subtract 1 because we are counting up from 0 **/
 	if (processedBits == UnoKeyboardConfig::DATA_PACKAGE_BITS_SIZE - 1) {
 		processedBits = 0;
-		((UnoKeyboardEvent*)eventInProgress)->addByte(transmissionValue);
+		if(eventInProgress != NULL) {
+			/** To be honest there`s a problem in case of event object absence **/
+			eventInProgress->addByte(transmissionValue);
+		}
 		/** Check if its longer key code or its a key release event **/
 		if (transmissionValue == UnoKeyConfig::RELEASE_KEY_VALUE
 				|| transmissionValue == UnoKeyConfig::EXTENDED_KEY_VALUE) {

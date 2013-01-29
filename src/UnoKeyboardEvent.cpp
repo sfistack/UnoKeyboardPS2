@@ -50,13 +50,16 @@ int UnoKeyboardEvent::getKey() {
 	 *  flag.
 	 */
 	for(int i = 0; i < eventBytesSize; i++) {
-		if(bytes[i] == UnoKeyConfig::RELEASE_KEY_VALUE) {
-			continue;
+		switch(bytes[i]) {
+			case UnoKeyConfig::RELEASE_KEY_VALUE:
+				break;
+			case UnoKeyConfig::EXTENDED_KEY_VALUE:
+				keyValue += 0x0F00;
+				break;
+			default:
+				keyValue += bytes[i];
+				break;
 		}
-		if(bytes[i] == UnoKeyConfig::EXTENDED_KEY_VALUE) {
-			keyValue += 0x0F00;
-		}
-		keyValue += bytes[i];
 	}
 	return keyValue;
 }
